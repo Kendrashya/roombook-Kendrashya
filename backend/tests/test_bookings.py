@@ -101,3 +101,153 @@ def test_unknown_attendee(client):
         },
     )
     assert res.status_code == 400
+
+
+def test_suggest_basic(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 45,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["slots"]) <= 3
+    starts = [s["start"] for s in body["slots"]]
+    assert starts == sorted(starts)
+
+
+def test_suggest_intern_cannot_book_board_room(client):
+    res = client.post(
+        "/rooms/2/suggest",
+        json={
+            "requester_id": 4,
+            "attendee_ids": [],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["slots"] == []
+
+
+def test_suggest_weekend_returns_empty(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 30,
+            "date": "2026-12-12",
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["slots"] == []
+
+
+def test_suggest_attendee_conflict(client):
+    # Chen (id 3) has "Hiring panel" 10:00-11:30 in Focus Room on 2026-12-07
+    res = client.post(
+        "/rooms/3/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [3],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 200
+    for slot in res.json()["slots"]:
+        start = slot["start"][11:16]
+        end = slot["end"][11:16]
+        assert not (start < "11:30" and end > "10:00")
+
+
+def test_suggest_lunch_long_meeting_rejected(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 45,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 200
+    for slot in res.json()["slots"]:
+        start = slot["start"][11:16]
+        end = slot["end"][11:16]
+        assert not (start < "14:00" and end > "13:00")
+
+
+def test_suggest_room_not_found(client):
+    res = client.post(
+        "/rooms/99/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 404
+
+
+def test_suggest_unknown_requester(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 99,
+            "attendee_ids": [],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 404
+
+
+def test_suggest_unknown_attendee(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [42],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 400
+
+
+def test_suggest_duration_too_short(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 10,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 422
+
+
+def test_suggest_slot_times_have_ist_offset(client):
+    res = client.post(
+        "/rooms/1/suggest",
+        json={
+            "requester_id": 1,
+            "attendee_ids": [],
+            "duration_minutes": 30,
+            "date": "2026-12-07",
+        },
+    )
+    assert res.status_code == 200
+    if res.json()["slots"]:
+        assert "+05:30" in res.json()["slots"][0]["start"]
+
+
+# ---- double-booking (concurrency) tests ----
