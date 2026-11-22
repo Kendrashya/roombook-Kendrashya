@@ -44,6 +44,25 @@ def test_overlapping_booking_is_rejected(client):
     assert res.status_code == 409
 
 
+def test_back_to_back_bookings_are_allowed(client):
+    """Back-to-back bookings (one ends exactly when the next starts) must not clash.
+
+    Focus Room has "Hiring panel" 10:00-11:30 on 2026-12-07, so a booking
+    starting at 11:30 (when it ends) must be accepted.
+    """
+    res = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 1,
+            "attendee_ids": [1],
+            "start": "2026-12-07T11:30:00",
+            "end": "2026-12-07T12:00:00",
+        },
+    )
+    assert res.status_code == 201, f"Expected 201, got {res.status_code}: {res.text}"
+
+
 def test_end_must_be_after_start(client):
     res = client.post(
         "/bookings",
