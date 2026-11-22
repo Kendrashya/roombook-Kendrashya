@@ -251,3 +251,52 @@ def test_suggest_slot_times_have_ist_offset(client):
 
 
 # ---- double-booking (concurrency) tests ----
+
+def test_exceeding_room_capacity_is_rejected(client):
+    """Booking more people than room capacity must be rejected with 400."""
+    # Focus Room has capacity 4; trying to book 5 unique people should fail.
+    res = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 1,
+            "attendee_ids": [2, 3, 4, 5, 6],  # 5 attendees + creator = 6 unique people
+            "start": "2026-12-07T13:00:00",
+            "end": "2026-12-07T13:30:00",
+            "title": "Over capacity",
+        },
+    )
+    assert res.status_code == 400
+    assert "capacity" in res.json()["detail"].lower()
+
+
+def test_overlapping_booking_sequentially_rejected(client):
+    """Second overlapping booking for the same room is rejected with 409."""
+    # First booking succeeds
+    res1 = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 1,
+            "attendee_ids": [1],
+            "start": "2026-12-07T13:00:00",
+            "end": "2026-12-07T13:30:00",
+            "title": "First",
+        },
+    )
+    assert res1.status_code == 201
+
+    # Second overlapping booking must be rejected
+    res2 = client.post(
+        "/bookings",
+        json={
+            "room_id": 1,
+            "creator_id": 2,
+            "attendee_ids": [2],
+            "start": "2026-12-07T13:15:00",
+            "end": "2026-12-07T13:45:00",
+            "title": "Second",
+        },
+    )
+    assert res2.status_code == 409
+    assert "already booked" in res2.json()["detail"].lower()
