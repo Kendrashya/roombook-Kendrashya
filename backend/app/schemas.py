@@ -55,3 +55,19 @@ class BookingOut(BaseModel):
     attendees: list[UserOut]
     start: datetime
     end: datetime
+
+
+class SuggestIn(BaseModel):
+    requester_id: int
+    attendee_ids: list[int] = Field(default_factory=list)
+    duration_minutes: int = Field(ge=15, le=240)
+    date: str  # "YYYY-MM-DD"
+
+
+class SlotOut(BaseModel):
+    start: str  # ISO 8601 with offset, e.g. "2026-12-07T14:00:00+05:30"
+    end: str
+
+
+class SuggestOut(BaseModel):
+    slots: list[SlotOut]
