@@ -17,9 +17,11 @@ export default function RoomList() {
       {error && <p className="error">{error}</p>}
       <ul>
         {rooms.map((room) => (
-          <li key={room.id}>
-            <strong>{room.name}</strong>
-            <span className="muted"> · seats {room.capacity}</span>
+          <li key={room.id} className="room-item">
+            <span>
+              <span className="room-name">{room.name}</span>
+              <span className="room-capacity">· {room.capacity} seats</span>
+            </span>
           </li>
         ))}
       </ul>

@@ -72,3 +72,35 @@ logic in the application layer where it can be tested and maintained.
   rooms concurrently are unaffected (which is correct).
 - If the application runs behind multiple workers without sticky sessions, the
   database lock still works correctly because it's at the DB level.
+
+## Task 4: React UI
+
+**Component:** `FindSlot.jsx` — a form to pick a room, attendees, duration, and
+date; calls `POST /rooms/{room_id}/suggest`; displays clickable slot buttons;
+booking a slot calls `POST /bookings`.
+
+**Error handling:**
+- 409 responses are surfaced as "slot taken by someone else" so the user can
+  pick another slot.
+- Loading states are shown during suggest and booking.
+- General errors show the API detail message.
+
+## AI usage
+
+- Used for scaffolding the suggest endpoint logic, writing the React component,
+  and drafting this document.
+- One suggestion I rejected: initially the AI proposed using PostgreSQL
+  `EXCLUDE` constraints for Task 3. I rejected it because the test suite uses
+  SQLite, which doesn't support EXCLUDE, and I wanted a solution that works
+  across both databases.
+
+## With more time
+
+- Add 15-minute boundary and duration validation to `POST /bookings`.
+- Add working-hours and lunch-hour validation to `POST /bookings`.
+- Add attendee conflict checks to `POST /bookings`.
+- Add cleaning buffer enforcement to `POST /bookings`.
+- Add frontend validation (duration multiples of 15, date is a weekday, etc.).
+- Add unit tests for `overlaps()` and suggest slot generation logic as pure
+  functions (not via HTTP).
+- Add end-to-end test for the full suggest → book flow.
