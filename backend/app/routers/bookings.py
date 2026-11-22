@@ -44,6 +44,22 @@ def create_booking(payload: BookingIn, db: Session = Depends(get_db)):
     if len(attendees) != len(attendee_ids):
         raise HTTPException(status_code=400, detail="Unknown attendee")
 
+    # Capacity check: total unique people (creator + attendees) must not exceed
+    # the room's capacity.
+    total_people = attendee_ids | {payload.creator_id}
+    if len(total_people) > room.capacity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Room capacity is {room.capacity}, but {len(total_people)} people would attend",
+        )
+
+    # Lock the room row to serialize concurrent booking attempts for the same
+    # room. This prevents two overlapping bookings from both succeeding when
+    # submitted at the same moment: the second transaction waits for the first
+    # to commit, then re-checks overlaps and gets a 409.
+    db.execute(select(Room).where(Room.id == room.id).with_for_update())
+    db.flush()
+
     existing = db.scalars(select(Booking).where(Booking.room_id == room.id)).all()
     for other in existing:
         if overlaps(other.start, other.end, payload.start, payload.end):
