@@ -14,10 +14,10 @@ Focus Room right after "Hiring panel" (10:00–11:30) ends.
 
 **Other problems noticed in the codebase:**
 - `create_booking` has a check-then-insert race condition: two concurrent
-  requests can both pass the overlap check before either inserts. (Not fixed
-  in this PR — planned for the prevent-double-booking PR.)
-- No validation that booking attendee count exceeds room capacity (not fixed
-  in this PR — planned for a follow-up).
+  requests can both pass the overlap check before either inserts. (Fixed in
+  Task 3 with row-level locking.)
+- **Fixed:** No validation that booking attendee count exceeds room capacity —
+  now rejected with 400 in `create_booking` (see `test_exceeding_room_capacity_is_rejected`).
 - No validation that booking start/end fall on 15-minute boundaries.
 - No validation that booking duration is a multiple of 15 minutes (15–240).
 - No validation that the booking is within working hours (09:30–18:30, Mon–Fri).
@@ -54,3 +54,21 @@ Return the first 3 valid slots.
   stored procedure or a recursive CTE.
 - Cleaning buffer for existing bookings >60 min blocks the room for 15 min
   after they end. This is applied only when checking room availability.
+
+## Task 3: Prevent double booking
+
+**Approach:** Row-level locking with `SELECT ... FOR UPDATE` on the room row
+inside the booking transaction. The first transaction to lock the room checks
+for overlaps and inserts; concurrent transactions block on the lock, then
+re-check overlaps after the first commits and get a 409.
+
+**Why this approach:** It works on both SQLite and PostgreSQL without needing
+database-specific features like PostgreSQL's EXCLUDE constraint. It keeps the
+logic in the application layer where it can be tested and maintained.
+
+**Where it stops working:**
+- Under very high contention, threads may pile up waiting for the row lock.
+- It only serializes bookings for the same room; two users booking different
+  rooms concurrently are unaffected (which is correct).
+- If the application runs behind multiple workers without sticky sessions, the
+  database lock still works correctly because it's at the DB level.
